@@ -1,0 +1,35 @@
+# --- .gitignore ファイルの中身 ---
+
+# 1. 仮想環境とキャッシュ
+__pycache__/
+*.pyc
+.env
+.venv/
+env/
+venv/
+
+# 2. 巨大なデータセット（これはPC内だけで管理する）
+*.pt
+*.csv
+*.zip
+# ※ ただし、重要な小さなCSV（設定ファイルなど）は例外的に上げても良い
+
+# 3. 実験ログ（MLflowやWandBのフォルダ）
+mlruns/
+wandb/
+artifacts/
+
+# 4. モデルファイル（重すぎるので基本無視、必要ならGoogle Driveなどへ）
+*.pth
+*.pkl
+
+# 5. OSのゴミファイル
+.DS_Store
+
+# --- .gitignore に追記/確認 ---
+
+# 1. 拡張子でJSONを全無視する（これが一番確実）
+*.json
+
+# 2. dataフォルダごと無視する（念のため再確認）
+data/
