@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 import json
 
-# --- 設定 (変更なし) ---
+# --- 設定 ---
 GAME_IDS = [
     '0021500003', '0021500021', '0021500030', '0021500044', '0021500055',
     '0021500062', '0021500073', '0021500086', '0021500095', '0021500109',
@@ -14,15 +14,16 @@ GAME_IDS = [
     '0021500178', '0021500189', '0021500202', '0021500213', '0021500223'
 ]
 TRACKING_DIR = './data/2016.NBA.Raw.SportVU.Game.Logs'
-OUTPUT_CSV = 'features_and_labels_20_GAMES.csv'
+OUTPUT_CSV = 'features_and_labels_20_GAMES_original.csv' # ファイル名だけ区別のため変更
 SECONDS_BEFORE_SHOT = 5
 MOMENTS_BEFORE = int(25 * SECONDS_BEFORE_SHOT) 
 MOMENTS_AFTER = int(25 * 0.5) 
 
-# --- PBPデータ取得 (変更なし) ---
+# --- PBPデータ取得 (以前のシンプルな実装) ---
 def get_pbp_data(game_id):
     print(f"\nProcessing {game_id}: PBPデータを取得中...")
     try:
+        # 特別なヘッダー偽装なし、標準の呼び出し
         pbp = playbyplayv2.PlayByPlayV2(game_id)
         pbp_df = pbp.get_data_frames()[0]
         return pbp_df
@@ -30,7 +31,7 @@ def get_pbp_data(game_id):
         print(f"  エラー: PBP取得失敗。スキップします。 {e}")
         return None
 
-# --- ★★★ v3.2: JSONトラッキングデータ取得ロジック (加速度対応) ★★★ ---
+# --- JSONトラッキングデータ取得ロジック (v3.2 加速度対応版) ---
 def parse_tracking_data_from_json(file_path):
     print(f"    .json ファイル {file_path} をパース中...")
     with open(file_path, 'r') as f:
@@ -75,20 +76,15 @@ def parse_tracking_data_from_json(file_path):
     df['vy'] = df['y'].diff(-1) * -1 / df['dt']
     df.loc[df['player_id'] != df['player_id'].shift(-1), ['vx', 'vy']] = np.nan
 
-    # ★★★ ここからが v3.2 の追加箇所 ★★★
     # 加速度 (a = dv/dt)
-    # 速度(vx, vy)の差分を計算
     df['ax'] = df['vx'].diff(-1) * -1 / df['dt']
     df['ay'] = df['vy'].diff(-1) * -1 / df['dt']
-    # プレーヤーが変わる境界で加速度もリセット
     df.loc[df['player_id'] != df['player_id'].shift(-1), ['ax', 'ay']] = np.nan
     
     # 計算不能な値（NaN）を0で埋める
-    # ★ ax, ay を追加
     df[['vx', 'vy', 'ax', 'ay']] = df[['vx', 'vy', 'ax', 'ay']].fillna(0)
-    # ★★★ v3.2 追加箇所ここまで ★★★
 
-    # game_clock_seconds の計算 (変更なし)
+    # game_clock_seconds の計算
     df['game_clock_seconds'] = (df['quarter'] > 4) * (720 + (df['quarter'] - 5) * 300) + \
                               (df['quarter'] <= 4) * (720 - (df['quarter'] - 1) * 720) + \
                               (720 - df['game_clock']) 
@@ -107,8 +103,7 @@ def load_tracking_data(game_id):
         print(f"  エラー: JSONファイルのパースに失敗しました。 {e}")
         return None
 
-# --- (これ以降の PBP照合、ゲーム処理、CSV保存ロジックは v3.1 から変更なし) ---
-
+# --- マッチング処理 ---
 def find_closest_moment(pbp_time_seconds, tracking_times):
     pbp_time_seconds = float(pbp_time_seconds)
     time_diffs = -np.abs(tracking_times - pbp_time_seconds)
